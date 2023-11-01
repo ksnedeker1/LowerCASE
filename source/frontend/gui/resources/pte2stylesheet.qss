@@ -1,0 +1,7 @@
+/*-----QPlainTextEdit-----*/
+QPlainTextEdit
+{
+	background-color: #282A3A;
+	color: #787eab;
+    border: 1px solid #43434C;
+}
