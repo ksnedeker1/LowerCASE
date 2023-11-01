@@ -1,0 +1,38 @@
+{
+    "modules": [
+        {
+            "id": 1,
+            "name": "SimpleOsc",
+            "parent": "generator",
+            "parameters": {
+                "gain": {"type": "float", "default": 0.8, "range": [0.0, 1.0]},
+                "frequency": {"type": "float", "default": 0.0, "range": [0.0, 40000.0]},
+                "waveform": {"type": "enum", "default": "sine", "values": ["sine", "square", "triangle", "sawtooth"]}
+            },
+            "max_inputs": 0,
+            "max_outputs": 1
+        },
+        {
+            "id": 2,
+            "name": "Reverb",
+            "parent": "processor",
+            "parameters": {
+                "wetDry": {"type": "float", "default": 0.5, "range": [0.0, 1.0]},
+                "decayTime": {"type": "float", "default": 350.0, "range": [0.0, 60000.0]}
+            },
+            "max_inputs": 1,
+            "max_outputs": 1
+        },
+        {
+            "id": 3,
+            "name": "Pitcher",
+            "parent": "sequencer",
+            "parameters": {
+                "pattern": {"type": "list", "default": [440.0, 466.2, 493.9]},
+                "step": {"type": "float", "default": 1.0, "range":  [0.0, 60000.0]}
+            },
+            "max_inputs": 0,
+            "max_outputs": 1
+        }
+    ]
+}
