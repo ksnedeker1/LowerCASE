@@ -1,75 +1,97 @@
+#include <JuceHeader.h>
 #include "MainComponent.h"
+#include "Audio.h"
 
 //==============================================================================
-MainComponent::MainComponent()
+MainComponent::MainComponent() 
+    : mixerController(mixerGraph), chainController(audioGraph)
 {
-    // Make sure you set the size of the component after
-    // you add any child components.
-    setSize (800, 600);
+    setSize(800, 600);
 
-    // Some platforms require permissions to open input channels so request that here
-    if (juce::RuntimePermissions::isRequired (juce::RuntimePermissions::recordAudio)
-        && ! juce::RuntimePermissions::isGranted (juce::RuntimePermissions::recordAudio))
+    // Some platforms require permissions to open input channels
+    if (juce::RuntimePermissions::isRequired(juce::RuntimePermissions::recordAudio)
+        && !juce::RuntimePermissions::isGranted(juce::RuntimePermissions::recordAudio))
     {
-        juce::RuntimePermissions::request (juce::RuntimePermissions::recordAudio,
-                                           [&] (bool granted) { setAudioChannels (granted ? 2 : 0, 2); });
+        juce::RuntimePermissions::request(juce::RuntimePermissions::recordAudio,
+            [&](bool granted)
+            {
+                if (granted)
+                {
+                    setAudioChannels(0, 2);
+                }
+            });
     }
     else
     {
-        // Specify the number of input and output channels that we want to open
-        setAudioChannels (2, 2);
+        setAudioChannels(0, 2);
     }
+    //MixerController mixerController(mixerGraph);
+    //mixerController.initialize();
+    //
+    //auto beeperProcessor = std::make_unique<Beeper>();
+    //auto beeperNode = audioGraph.addNode(std::move(beeperProcessor));
+    //if (beeperNode)
+    //{
+    //    mixerController.connectToChannel(beeperNode->nodeID, 0);
+    //}
+
+    //AudioGraphWrapper agw(mixerGraph);
+    //agw.initialize();
+
+    startTimer(3000);
+
+    chainController.createNode(1, std::make_unique<Beeper>());
+
+    chainController.createNode(2, std::make_unique<SimpleReverb>(0.4, 0.3, 1.0, 0.6, 0.0));
+    
+    chainController.createNode(3, std::make_unique<Gain>(0.2));
+
+    chainController.createNode(4, std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
+        juce::AudioProcessorGraph::AudioGraphIOProcessor::IODeviceType::audioOutputNode));
+
+    chainController.createChain(1, std::vector<int>{ 1, 3, 4 });
+
+    //chainController.connectNodes(beeperExternalId, simpleReverbExternalId);
+    //chainController.connectNodes(simpleReverbExternalId, gainExternalId);
+    //chainController.connectNodes(gainExternalId, outputExternalId);
+    //chainController.disconnectNodes(simpleReverbExternalId, gainExternalId);
+    //chainController.connectNodes(simpleReverbExternalId, gainExternalId);
 }
 
 MainComponent::~MainComponent()
 {
-    // This shuts down the audio device and clears the audio source.
     shutdownAudio();
 }
 
-//==============================================================================
-void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRate)
-{
-    // This function will be called when the audio device is started, or when
-    // its settings (i.e. sample rate, block size, etc) are changed.
-
-    // You can use this function to initialise any resources you might need,
-    // but be careful - it will be called on the audio thread, not the GUI thread.
-
-    // For more details, see the help for AudioProcessor::prepareToPlay()
+void MainComponent::timerCallback() {
+    addSecondChain();
+    stopTimer();
 }
 
-void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill)
+void MainComponent::addSecondChain() {
+    chainController.updateChain(1, std::vector<int>{ 1, 2, 3, 4 });
+}
+
+void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
-    // Your audio-processing code goes here!
+    audioGraph.setPlayConfigDetails(0, 2, sampleRate, samplesPerBlockExpected);
+    audioGraph.prepareToPlay(sampleRate, samplesPerBlockExpected);
+}
 
-    // For more details, see the help for AudioProcessor::getNextAudioBlock()
-
-    // Right now we are not producing any data, in which case we need to clear the buffer
-    // (to prevent the output of random noise)
-    bufferToFill.clearActiveBufferRegion();
+void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
+{
+    juce::MidiBuffer midiMessages;
+    audioGraph.processBlock(*bufferToFill.buffer, midiMessages);
 }
 
 void MainComponent::releaseResources()
 {
-    // This will be called when the audio device stops, or when it is being
-    // restarted due to a setting change.
-
-    // For more details, see the help for AudioProcessor::releaseResources()
+    audioGraph.releaseResources();
 }
 
-//==============================================================================
-void MainComponent::paint (juce::Graphics& g)
+void MainComponent::paint(juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-
-    // You can add your drawing code here!
+    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 }
 
-void MainComponent::resized()
-{
-    // This is called when the MainContentComponent is resized.
-    // If you add any child components, this is where you should
-    // update their positions.
-}
+void MainComponent::resized() {}
