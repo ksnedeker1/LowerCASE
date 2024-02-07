@@ -1,15 +1,22 @@
 #include "SimpleOsc.h"
 
+//-----------------------------------------------------------------------------------//
+
 SimpleOsc::SimpleOsc(float frequency, const juce::String& waveform)
     : currentFrequency(frequency)
 {
     setWaveform(waveform);
 }
 
+//-----------------------------------------------------------------------------------//
+
 SimpleOsc::~SimpleOsc() {}
+
+//-----------------------------------------------------------------------------------//
 
 void SimpleOsc::setWaveform(const juce::String& waveform)
 {
+    // Available waveform definitions
     if (waveform == "sine")
         oscillator.initialise([](float x) { return std::sin(x); });
     else if (waveform == "saw")
@@ -22,6 +29,8 @@ void SimpleOsc::setWaveform(const juce::String& waveform)
         oscillator.initialise([](float x) { return std::sin(x); });
 }
 
+//-----------------------------------------------------------------------------------//
+
 void SimpleOsc::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     juce::dsp::ProcessSpec spec;
@@ -32,6 +41,8 @@ void SimpleOsc::prepareToPlay(double sampleRate, int samplesPerBlock)
     oscillator.prepare(spec);
 }
 
+//-----------------------------------------------------------------------------------//
+
 void SimpleOsc::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::dsp::AudioBlock<float> audioBlock(buffer);
@@ -39,5 +50,7 @@ void SimpleOsc::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
     oscillator.setFrequency(currentFrequency);
     oscillator.process(context);
 }
+
+//-----------------------------------------------------------------------------------//
 
 void SimpleOsc::setFrequency(float frequency) { currentFrequency = frequency; }

@@ -1,13 +1,15 @@
 #include "ChannelUtil.h"
 
+//-----------------------------------------------------------------------------------//
+
 ChannelUtil::ChannelUtil(float initialGain, float initialPanning, bool initialBypassed)
-    : gain(initialGain), panning(initialPanning), bypassed(initialBypassed)
-{
-}
+    : gain(initialGain), panning(initialPanning), bypassed(initialBypassed) {}
 
 ChannelUtil::~ChannelUtil() {}
 
-void ChannelUtil::prepareToPlay(double sampleRate, int samplesPerBlock) { }
+//-----------------------------------------------------------------------------------//
+
+void ChannelUtil::prepareToPlay(double sampleRate, int samplesPerBlock) {}
 
 void ChannelUtil::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
@@ -26,13 +28,19 @@ void ChannelUtil::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffe
 
 void ChannelUtil::reset() {}
 
+//-----------------------------------------------------------------------------------//
+
 void ChannelUtil::setGain(float newGain) { gain = newGain; }
 
 float ChannelUtil::getGain() const { return gain; }
 
+//-----------------------------------------------------------------------------------//
+
 void ChannelUtil::setPanning(float newPanning) { panning = newPanning; }
 
 float ChannelUtil::getPanning() const { return panning; }
+
+//-----------------------------------------------------------------------------------//
 
 void ChannelUtil::setBypassed(bool shouldBeBypassed) { bypassed = shouldBeBypassed; }
 
