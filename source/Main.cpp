@@ -1,78 +1,45 @@
 #include <JuceHeader.h>
 #include "MainComponent.h"
 
-//==============================================================================
-class LowerCASEApplication  : public juce::JUCEApplication
+//-----------------------------------------------------------------------------------//
+
+class LowerCASEApplication : public juce::JUCEApplication
 {
 public:
-    //==============================================================================
+    //-----------------------------------------------------------------------------------//
+
     LowerCASEApplication() {}
 
-    const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
-    const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
-    bool moreThanOneInstanceAllowed() override             { return true; }
+    //-----------------------------------------------------------------------------------//
 
-    //==============================================================================
-    void initialise (const juce::String& commandLine) override
+    const juce::String getApplicationName() override { return ProjectInfo::projectName; }
+    const juce::String getApplicationVersion() override { return ProjectInfo::versionString; }
+    bool moreThanOneInstanceAllowed() override { return true; }
+
+    //-----------------------------------------------------------------------------------//
+
+    void initialise(const juce::String& commandLine) override
     {
-        mainWindow.reset (new MainWindow (getApplicationName()));
+        mainComponent = std::make_unique<MainComponent>();
     }
 
-    void shutdown() override
-    {
-        mainWindow = nullptr; // (deletes our window)
-    }
+    void shutdown() override { mainComponent = nullptr; }
 
-    //==============================================================================
+    //-----------------------------------------------------------------------------------//
+
     void systemRequestedQuit() override
     {
         quit();
     }
 
-    void anotherInstanceStarted (const juce::String& commandLine) override
-    {
-
-    }
-
-    //==============================================================================
-    /*
-        This class implements the desktop window that contains an instance of
-        our MainComponent class.
-    */
-    class MainWindow    : public juce::DocumentWindow
-    {
-    public:
-        MainWindow (juce::String name)
-            : DocumentWindow (name,
-                              juce::Desktop::getInstance().getDefaultLookAndFeel()
-                                                          .findColour (juce::ResizableWindow::backgroundColourId),
-                              DocumentWindow::allButtons)
-        {
-            setUsingNativeTitleBar (true);
-            setContentOwned (new MainComponent(), true);
-
-           #if JUCE_IOS || JUCE_ANDROID
-            setFullScreen (true);
-           #else
-            setResizable (true, true);
-            centreWithSize (getWidth(), getHeight());
-           #endif
-
-            setVisible (true);
-        }
-
-        void closeButtonPressed() override
-        {
-            JUCEApplication::getInstance()->systemRequestedQuit();
-        }
-
-    private:
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
-    };
+    void anotherInstanceStarted(const juce::String& commandLine) override {}
 
 private:
-    std::unique_ptr<MainWindow> mainWindow;
+    //-----------------------------------------------------------------------------------//
+
+    std::unique_ptr<MainComponent> mainComponent;
 };
 
-//==============================================================================
-START_JUCE_APPLICATION (LowerCASEApplication)
+//-----------------------------------------------------------------------------------//
+
+START_JUCE_APPLICATION(LowerCASEApplication)
