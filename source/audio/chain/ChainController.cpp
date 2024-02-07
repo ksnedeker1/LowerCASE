@@ -1,16 +1,24 @@
 #include "ChainController.h"
 
+//-----------------------------------------------------------------------------------//
+
 ChainController::ChainController(juce::AudioProcessorGraph& graph)
     : audioGraph(graph) {}
 
-void ChainController::clear() {
+//-----------------------------------------------------------------------------------//
+
+void ChainController::clear()
+{
     audioGraph.clear();
     nodeIdMap.clear();
     connectionSet.clear();
     chainMap.clear();
 }
 
-void ChainController::createNode(int externalId, std::unique_ptr<juce::AudioProcessor> processor) {
+//-----------------------------------------------------------------------------------//
+
+void ChainController::createNode(int externalId, std::unique_ptr<juce::AudioProcessor> processor)
+{
     auto node = audioGraph.addNode(std::move(processor));
     if (node) {
         nodeIdMap[externalId] = node->nodeID;
@@ -20,7 +28,8 @@ void ChainController::createNode(int externalId, std::unique_ptr<juce::AudioProc
     }
 }
 
-void ChainController::deleteNode(int externalId) {
+void ChainController::deleteNode(int externalId)
+{
     auto nodeId = getNodeId(externalId);
     audioGraph.removeNode(nodeId);
     nodeIdMap.erase(externalId);
@@ -37,50 +46,10 @@ void ChainController::deleteNode(int externalId) {
     }
 }
 
-juce::AudioProcessorGraph::NodeID ChainController::getNodeId(int externalId) const {
-    auto it = nodeIdMap.find(externalId);
-    if (it != nodeIdMap.end()) {
-        return it->second;
-    }
-    else {
-        DBG("Node ID not found for external ID: " << externalId);
-        return juce::AudioProcessorGraph::NodeID();
-    }
-}
+//-----------------------------------------------------------------------------------//
 
-void ChainController::connectNodes(int sourceExternalId, int destExternalId) {
-    auto sourceNodeId = getNodeId(sourceExternalId);
-    auto destNodeId = getNodeId(destExternalId);
-
-    for (int channel = 0; channel < 2; ++channel) {
-        if (audioGraph.addConnection({ {sourceNodeId, channel}, {destNodeId, channel} })) {
-            connectionSet.insert({ sourceExternalId, destExternalId });
-        }
-        else {
-            DBG("Failed to connect nodes: " << sourceExternalId << " to " << destExternalId);
-        }
-    }
-}
-
-void ChainController::disconnectNodes(int sourceExternalId, int destExternalId) {
-    auto sourceNodeId = getNodeId(sourceExternalId);
-    auto destNodeId = getNodeId(destExternalId);
-
-    auto connection = std::make_pair(sourceExternalId, destExternalId);
-    if (connectionSet.find(connection) != connectionSet.end()) {
-        for (int channel = 0; channel < 2; ++channel) {
-            if (!audioGraph.removeConnection({ {sourceNodeId, channel}, {destNodeId, channel} })) {
-                DBG("Failed to disconnect nodes: " << sourceExternalId << " to " << destExternalId);
-            }
-        }
-        connectionSet.erase(connection);
-    }
-    else {
-        DBG("Connection not found between nodes: " << sourceExternalId << " to " << destExternalId);
-    }
-}
-
-void ChainController::createChain(int chainId, const std::vector<int>& nodeExternalIds) {
+void ChainController::createChain(int chainId, const std::vector<int>& nodeExternalIds)
+{
     if (nodeExternalIds.size() < 2) {
         DBG("Chain requires at least two nodes");
         return;
@@ -96,7 +65,8 @@ void ChainController::createChain(int chainId, const std::vector<int>& nodeExter
     chainMap[chainId] = chainNodes;
 }
 
-void ChainController::updateChain(int chainId, const std::vector<int>& newExternalIds) {
+void ChainController::updateChain(int chainId, const std::vector<int>& newExternalIds)
+{
     auto chainIt = chainMap.find(chainId);
     if (chainIt != chainMap.end()) {
         // Disconnect existing chain nodes
@@ -121,7 +91,8 @@ void ChainController::updateChain(int chainId, const std::vector<int>& newExtern
     }
 }
 
-void ChainController::deleteChain(int chainId) {
+void ChainController::deleteChain(int chainId)
+{
     auto chainIt = chainMap.find(chainId);
     if (chainIt != chainMap.end()) {
         const auto& chainNodes = chainIt->second;
@@ -135,14 +106,91 @@ void ChainController::deleteChain(int chainId) {
     }
 }
 
-const std::unordered_map<int, juce::AudioProcessorGraph::NodeID>& ChainController::getNodeIdMap() const {
+//-----------------------------------------------------------------------------------//
+
+void ChainController::connectNodes(int sourceExternalId, int destExternalId)
+{
+    auto sourceNodeId = getNodeId(sourceExternalId);
+    auto destNodeId = getNodeId(destExternalId);
+
+    for (int channel = 0; channel < 2; ++channel) {
+        if (audioGraph.addConnection({ {sourceNodeId, channel}, {destNodeId, channel} })) {
+            connectionSet.insert({ sourceExternalId, destExternalId });
+        }
+        else {
+            DBG("Failed to connect nodes: " << sourceExternalId << " to " << destExternalId);
+        }
+    }
+}
+
+void ChainController::disconnectNodes(int sourceExternalId, int destExternalId)
+{
+    auto sourceNodeId = getNodeId(sourceExternalId);
+    auto destNodeId = getNodeId(destExternalId);
+
+    auto connection = std::make_pair(sourceExternalId, destExternalId);
+    if (connectionSet.find(connection) != connectionSet.end()) {
+        for (int channel = 0; channel < 2; ++channel) {
+            if (!audioGraph.removeConnection({ {sourceNodeId, channel}, {destNodeId, channel} })) {
+                DBG("Failed to disconnect nodes: " << sourceExternalId << " to " << destExternalId);
+            }
+        }
+        connectionSet.erase(connection);
+    }
+    else {
+        DBG("Connection not found between nodes: " << sourceExternalId << " to " << destExternalId);
+    }
+}
+
+//-----------------------------------------------------------------------------------//
+
+juce::AudioProcessorGraph::NodeID ChainController::getNodeId(int externalId) const
+{
+    auto it = nodeIdMap.find(externalId);
+    if (it != nodeIdMap.end()) {
+        return it->second;
+    }
+    else {
+        DBG("Node ID not found for external ID: " << externalId);
+        return juce::AudioProcessorGraph::NodeID();
+    }
+}
+
+const std::unordered_map<int, juce::AudioProcessorGraph::NodeID>& ChainController::getNodeIdMap() const
+{
     return nodeIdMap;
 }
 
-const std::set<std::pair<int, int>>& ChainController::getConnectionSet() const {
+const std::set<std::pair<int, int>>& ChainController::getConnectionSet() const
+{
     return connectionSet;
 }
 
-const std::unordered_map<int, std::vector<int>>& ChainController::getChainMap() const {
+const std::unordered_map<int, std::vector<int>>& ChainController::getChainMap() const
+{
     return chainMap;
+}
+
+std::string ChainController::getGraphDescription() const
+{
+    std::ostringstream description;
+
+    description << "Nodes:\n";
+    for (auto& node : audioGraph.getNodes()) {
+        description << "Node ID: " << node->nodeID.uid << ", Processor: " << node->getProcessor()->getName() << "\n";
+    }
+
+    description << "\nConnections:\n";
+    for (auto& connection : audioGraph.getConnections()) {
+        auto sourceNode = audioGraph.getNodeForId(connection.source.nodeID);
+        auto destNode = audioGraph.getNodeForId(connection.destination.nodeID);
+        if (sourceNode && destNode) {
+            description << "SrcID: " << sourceNode->nodeID.uid
+                << " (Channel " << connection.source.channelIndex << ")"
+                << " DestID: " << destNode->nodeID.uid
+                << " (Channel " << connection.destination.channelIndex << ")\n";
+        }
+    }
+
+    return description.str();
 }

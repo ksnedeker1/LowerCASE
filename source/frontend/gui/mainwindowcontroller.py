@@ -1,10 +1,15 @@
 import sys
+import zmq
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor
 from gui.mainwindow import Ui_MainWindow
 from gui.ptelistener import PTEListener
 from gui.syntaxhighlighter import SyntaxHighlighter
 from environment.scriptvalidator import ScriptValidator
+from environment.parser import ScriptParser
+from comm.zmqdispatcher import ZMQDispatcher
+from comm.msgreg import *
 
 
 class MainWindowController(QMainWindow, Ui_MainWindow):
@@ -24,9 +29,12 @@ class MainWindowController(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.init_element_states()
         self.init_element_connections()
-        self.init_pte_listener()
-        self.init_script_validator()
-        self.init_syntax_highlighter()
+        # self.init_pte_listener()
+        # self.init_script_validator()
+        # self.init_syntax_highlighter()
+        self.zmq_dispatcher = ZMQDispatcher()
+        self.zmq_dispatcher.messageReceived.connect(self.handle_message_received)
+        self.zmq_dispatcher.start()
 
     def init_element_states(self):
         """
@@ -59,7 +67,8 @@ class MainWindowController(QMainWindow, Ui_MainWindow):
 
     def init_pte_listener(self):
         self.pte_listener = PTEListener(self.scriptPlainTextEdit)
-        self.pte_listener.textChanged.connect(self.validate_script)
+        # self.pte_listener.textChanged.connect(self.validate_script)
+        self.pte_listener.textChanged.connect(self.parse_script)
         self.pte_listener.start()
 
     def init_script_validator(self):
@@ -67,6 +76,12 @@ class MainWindowController(QMainWindow, Ui_MainWindow):
 
     def init_syntax_highlighter(self):
         self.syntax_highlighter = SyntaxHighlighter(self.scriptPlainTextEdit.document())
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Space and event.modifiers() & Qt.ControlModifier:
+            self.parse_script(self.scriptPlainTextEdit.toPlainText())
+        if event.key() == Qt.Key_R and event.modifiers() & Qt.ControlModifier:
+            self.parse_script(self.message_backend(CRUD_HANDLER + 'CLEAR_ALL'))
 
     def validate_script(self, script_text):
         """
@@ -117,15 +132,15 @@ class MainWindowController(QMainWindow, Ui_MainWindow):
 
     def on_click_audio_toggle(self):
         """
-        Toggle audio generation
+        Toggle audio generation.
         """
         self.audioRunning = not self.audioRunning
         if self.audioRunning:
             self.audioToggleButton.setText(" Stop Audio ")
         else:
             self.audioToggleButton.setText(" Start Audio ")
-        # TODO: Call exposed backend function to start/stop audio
-        pass
+        print(ACTION_HANDLER)
+        self.message_backend(ACTION_HANDLER + 'TOGGLE_AUDIO')
 
     def on_tempo_spin_changed(self, value):
         """
@@ -141,6 +156,28 @@ class MainWindowController(QMainWindow, Ui_MainWindow):
         volume = value / 100
         # TODO: Call exposed backend function to update master gain
         pass
+
+    def parse_script(self, script_text):
+        parser = ScriptParser(script_text)
+        backend_commands = parser.generate_commands()
+        if backend_commands:
+            self.update_log("\n=========================\n")
+            for command in backend_commands:
+                self.message_backend(command)
+                self.update_log(command)
+            self.update_log("\n=========================")
+
+    def message_backend(self, message):
+        print(f"Queueing message: {message}")
+        self.zmq_dispatcher.send_message(message)
+
+    def handle_message_received(self, message):
+        self.update_log("\n=========================\n")
+        self.update_log(message)
+        self.update_log("\n=========================")
+
+    def shutdown(self):
+        self.zmq_dispatcher.stop()
 
 
 def launch(module_json_file_path):

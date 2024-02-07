@@ -1,15 +1,20 @@
 #include "Beeper.h"
 
-Beeper::Beeper()
-    : currentFrequency(220.0f),
+//-----------------------------------------------------------------------------------//
+
+Beeper::Beeper(float initialFrequency, float soundDurationProportion)
+    : currentFrequency(initialFrequency),
     sampleCounter(0),
     soundDuration(0),
-    silenceDuration(0)
+    soundDurationProportion(soundDurationProportion)
 {
+    // Saw wave
     oscillator.initialise([](float x) { return x / juce::MathConstants<float>::pi - 1.0f; });
 }
 
 Beeper::~Beeper() {}
+
+//-----------------------------------------------------------------------------------//
 
 void Beeper::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
@@ -19,11 +24,14 @@ void Beeper::prepareToPlay(double sampleRate, int samplesPerBlock)
     spec.numChannels = getMainBusNumOutputChannels();
 
     oscillator.prepare(spec);
+    oscillator.setFrequency(currentFrequency);
 
-    // beep for 1/3, silence for 2/3
-    soundDuration = static_cast<int>(sampleRate / 3);
-    silenceDuration = static_cast<int>(2 * sampleRate / 3);
+    // Calculate sound and silence durations based on the proportion
+    soundDuration = static_cast<int>(sampleRate * soundDurationProportion);
+    silenceDuration = static_cast<int>(sampleRate * (1.0f - soundDurationProportion));
 }
+
+//-----------------------------------------------------------------------------------//
 
 void Beeper::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
@@ -32,33 +40,31 @@ void Beeper::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& mi
 
     oscillator.setFrequency(currentFrequency);
 
+    // Write signal to all samples in buffer
     oscillator.process(context);
 
     for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
     {
         auto* channelData = buffer.getWritePointer(channel);
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-        {
+        {   
+            // Overwrite samples beyond soundDuration with silence
             if (sampleCounter >= soundDuration)
             {
                 channelData[sample] = 0.0f;
             }
+
             sampleCounter++;
+
+            // Reset when cycle length is met
             if (sampleCounter >= (soundDuration + silenceDuration))
             {
                 sampleCounter = 0;
             }
         }
     }
-    if (buffer.getNumChannels() > 0)
-    {
-        auto* channelData = buffer.getReadPointer(0);
-        DBG("Buffer Sample Check: ");
-        for (int i = 0; i < buffer.getNumSamples() && i < 10; ++i)
-        {
-            DBG("Beeper sample sent " << i << ": " << channelData[i]);
-        }
-    }
 }
+
+//-----------------------------------------------------------------------------------//
 
 const juce::String Beeper::getName() const { return "Beeper"; }

@@ -2,13 +2,16 @@
 #include "MainComponent.h"
 #include "Audio.h"
 
-//==============================================================================
-MainComponent::MainComponent() 
-    : mixerController(mixerGraph), chainController(audioGraph)
+//-----------------------------------------------------------------------------------//
+
+MainComponent::MainComponent()
+    : mixerController(mixerGraph),
+    chainController(audioGraph),
+    zmqContext(1),
+    zmqSocket(std::make_unique<zmq::socket_t>(zmqContext, ZMQ_REP))
 {
     setSize(800, 600);
 
-    // Some platforms require permissions to open input channels
     if (juce::RuntimePermissions::isRequired(juce::RuntimePermissions::recordAudio)
         && !juce::RuntimePermissions::isGranted(juce::RuntimePermissions::recordAudio))
     {
@@ -25,37 +28,14 @@ MainComponent::MainComponent()
     {
         setAudioChannels(0, 2);
     }
-    //MixerController mixerController(mixerGraph);
-    //mixerController.initialize();
-    //
-    //auto beeperProcessor = std::make_unique<Beeper>();
-    //auto beeperNode = audioGraph.addNode(std::move(beeperProcessor));
-    //if (beeperNode)
-    //{
-    //    mixerController.connectToChannel(beeperNode->nodeID, 0);
-    //}
 
-    //AudioGraphWrapper agw(mixerGraph);
-    //agw.initialize();
+    actionHandler = std::make_unique<ActionHandler>(this);
+    crudHandler = std::make_unique<CRUDHandler>();
+    dispatcher = std::make_unique<Dispatcher>(crudHandler.get(), actionHandler.get());
 
-    startTimer(3000);
+    zmqSocket->bind("tcp://*:5555");
 
-    chainController.createNode(1, std::make_unique<Beeper>());
-
-    chainController.createNode(2, std::make_unique<SimpleReverb>(0.4, 0.3, 1.0, 0.6, 0.0));
-    
-    chainController.createNode(3, std::make_unique<Gain>(0.2));
-
-    chainController.createNode(4, std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
-        juce::AudioProcessorGraph::AudioGraphIOProcessor::IODeviceType::audioOutputNode));
-
-    chainController.createChain(1, std::vector<int>{ 1, 3, 4 });
-
-    //chainController.connectNodes(beeperExternalId, simpleReverbExternalId);
-    //chainController.connectNodes(simpleReverbExternalId, gainExternalId);
-    //chainController.connectNodes(gainExternalId, outputExternalId);
-    //chainController.disconnectNodes(simpleReverbExternalId, gainExternalId);
-    //chainController.connectNodes(simpleReverbExternalId, gainExternalId);
+    startTimer(100);
 }
 
 MainComponent::~MainComponent()
@@ -63,14 +43,29 @@ MainComponent::~MainComponent()
     shutdownAudio();
 }
 
-void MainComponent::timerCallback() {
-    addSecondChain();
-    stopTimer();
+//-----------------------------------------------------------------------------------//
+
+void MainComponent::timerCallback()
+{
+    zmq::pollitem_t items[] =
+    {
+        { static_cast<void*>(*zmqSocket), 0, ZMQ_POLLIN, 0 }
+    };
+    zmq::poll(&items[0], 1, 0);
+
+    if (items[0].revents & ZMQ_POLLIN)
+    {
+        zmq::message_t message;
+        zmqSocket->recv(message, zmq::recv_flags::none);
+        handleZeroMQMessage(message.to_string());
+    }
 }
 
 void MainComponent::addSecondChain() {
     chainController.updateChain(1, std::vector<int>{ 1, 2, 3, 4 });
 }
+
+//-----------------------------------------------------------------------------------//
 
 void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
@@ -89,9 +84,41 @@ void MainComponent::releaseResources()
     audioGraph.releaseResources();
 }
 
+//-----------------------------------------------------------------------------------//
+
 void MainComponent::paint(juce::Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 }
 
 void MainComponent::resized() {}
+
+//-----------------------------------------------------------------------------------//
+
+void MainComponent::handleZeroMQMessage(const std::string& message)
+{
+    DBG("Received message: " + juce::String(message));
+    dispatcher->dispatch(message, chainController);
+
+    std::string graphDescription = chainController.getGraphDescription();
+    sendZeroMQMessage(graphDescription);
+}
+
+void MainComponent::sendZeroMQMessage(const std::string& message)
+{
+    zmqSocket->send(zmq::buffer(message), zmq::send_flags::none);
+}
+
+//-----------------------------------------------------------------------------------//
+
+void MainComponent::toggleAudio()
+{
+    if (isAudioRunning) {
+        deviceManager.closeAudioDevice();
+        isAudioRunning = false;
+    }
+    else {
+        deviceManager.restartLastAudioDevice();
+        isAudioRunning = true;
+    }
+}
